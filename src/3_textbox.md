@@ -51,8 +51,8 @@ const sections = container.selectAll(".scroll-section")
     .attr("data-step", d => d.section);
 
 // Add the title to each section
-sections.append("h1")
-  .text(d => d.title);
+// sections.append("h1")
+//   .text(d => d.title);
 
 // Add the text-section with proper data-group attribute
 const textSections = sections.append("div")
@@ -115,11 +115,12 @@ svg.append("g").attr("class", "totals");
 
 // 7) Define update function
 function updateChart(sectionNumber) {
+  // (1) Compute the stacked segments & y‑domain 
   const segs = getSegments(+sectionNumber);
   const maxY = d3.max(segs, d => d.y1);
   y.domain([0, maxY]).nice();
 
-  // --- segments ---
+  // --- segments --- (2) Draw the bars
   svg.select("g.bars").selectAll("rect.segment")
     .data(segs, d => d.key)
     .join(
@@ -145,7 +146,7 @@ function updateChart(sectionNumber) {
         .remove()
     );
 
-  // --- value labels ---
+  // --- value labels --- (3) In‐segment value labels
   svg.select("g.values").selectAll("text.value")
     .data(segs.filter(d => d.value > 0), d => d.key)
     .join(
@@ -199,7 +200,49 @@ function updateChart(sectionNumber) {
 
       exit => exit.remove()
     );
+  // 5) Outside annotations (legend‐labels)
+  const annotations = [
+    { key: "profit", label: "Profit",         sub: "Kept by U.S. Grocery" },
+    { key: "tariff", label: "Tariff",         sub: "Paid by U.S. Grocery to U.S. government" },
+    { key: "cost",   label: "Price of imported avocado", sub: "Paid by U.S. Grocery to Mexican supplier" },
+  ];
+
+  const annX = x("bar") + x.bandwidth() + 24;   // 24px to the right of bar
+  const lineHeight = 18;
+
+  const ann = svg.selectAll("g.annotation")
+    .data(annotations, d=>d.key)
+    .join(
+      enter => {
+        const g = enter.append("g")
+          .attr("class","annotation")
+          .attr("transform", (d,i) => `translate(${annX}, ${ margin.top + i * (lineHeight*2.5) })`);
+        g.append("text")
+          .attr("class","ann-title")
+          .attr("y", 0)
+          .attr("font-size","12px")
+          .attr("font-weight","600")
+          .attr("fill", d=>color(d.key))
+          .text(d=>`$${ getRowValue(sectionNumber,d.key).toFixed(2) }  ${d.label}`);
+        g.append("text")
+          .attr("class","ann-sub")
+          .attr("y", lineHeight)
+          .attr("font-size","10px")
+          .attr("fill", d=>color(d.key))
+          .text(d=>d.sub);
+        return g;
+      },
+      update => update,
+      exit => exit.remove()
+    );
+
+  // helper to pull the numeric value for each segment
+  function getRowValue(sec, key) {
+    const row = data.find(d=>d.section===+sec) || { cost:0,tariff:0,profit:0 };
+    return row[key];
+  }
 }
+
 
 // 8) Set up the intersection observer AFTER sections are created
 // (This was likely the issue - observer was set up before sections existed)
@@ -211,12 +254,8 @@ const obs = new IntersectionObserver((ents) => {
                  .sort((a,b) => b.intersectionRatio - a.intersectionRatio)[0];
   if (best) {
     const step = +best.target.dataset.step;
-    info.textContent = step;
-    info.className = `test test--step-${step}`;
     updateChart(step);
   } else {
-    info.textContent = "0";
-    info.className = "test";
     updateChart(0);
   }
 }, {
@@ -226,7 +265,7 @@ const obs = new IntersectionObserver((ents) => {
 
 // 9) Start observing sections and initialize chart
 secs.forEach(s => obs.observe(s));
-updateChart(1); // Initialize the chart with section 1 data
+updateChart(0); // Initialize the chart with section 1 data
 
 invalidation.then(() => obs.disconnect());
 ```
@@ -406,7 +445,7 @@ invalidation.then(() => obs.disconnect());
     .forEach(node => observer.observe(node));
 
   // seed the chart so you see SECTION 1 before any scroll
-  updateChart(1);
+  updateChart(0);
 })();
 ``` -->
 
@@ -465,8 +504,8 @@ invalidation.then(() => obs.disconnect());
   display: flex;
   align-items: start;
   justify-content: center;
-  border: solid 1px var(--theme-foreground-focus);
-  background: color-mix(in srgb, var(--theme-foreground-focus) 5%, transparent);
+  /* border: solid 1px var(--theme-foreground-focus); */
+  /* background: color-mix(in srgb, var(--theme-foreground-focus) 5%, transparent); */
   padding: 1rem;
   box-sizing: border-box;
 }
